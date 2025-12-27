@@ -1,7 +1,7 @@
 import { metrics } from '@opentelemetry/api';
 
 // Get the global meter
-const meter = metrics.getMeter('nextjs-app', '0.1.0');
+const meter = metrics.getMeter('nextjs-app');  // , '0.1.0'
 
 // Create metric instruments
 export const sessionsCreatedCounter = meter.createCounter('sessions_created_total', {

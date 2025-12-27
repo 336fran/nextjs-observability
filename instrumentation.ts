@@ -2,6 +2,7 @@
 
 Resources
 - https://github.com/adityasinghcodes/nextjs-monitoring/blob/main/instrumentation.ts
+- OTEL metrics: https://opentelemetry.io/docs/languages/js/instrumentation/#metrics
 
 */
 
