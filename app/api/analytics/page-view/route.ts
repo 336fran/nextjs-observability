@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   recordSessionCreated,
   recordPageView,
-  recordSessionDuration,
 } from '@/app/lib/metrics';
 
 export async function POST(request: NextRequest) {
@@ -23,16 +22,19 @@ export async function POST(request: NextRequest) {
       console.log(
         `[PAGE_VIEW_API] NEW SESSION | Session: ${sessionData.sessionId} | IP: ${clientIp} | First Page: ${pathname} | Referrer: ${sessionData.firstReferrer} | ${timestamp}`
       );
-    } else {
-      // Record session duration since session started
-      const sessionStartTime = new Date(sessionData.sessionStartTime);
-      const currentTime = new Date(timestamp);
-      const durationSeconds = (currentTime.getTime() - sessionStartTime.getTime()) / 1000;
-      recordSessionDuration(durationSeconds, sessionData.firstPage, sessionData.firstReferrer);
     }
+    // NOTE: Session duration is now recorded on session end via /api/analytics/session-end
+    // Kept this code for reference if you need to record duration on every page view:
+    // else {
+    //   // Record session duration since session started
+    //   const sessionStartTime = new Date(sessionData.sessionStartTime);
+    //   const currentTime = new Date(timestamp);
+    //   const durationSeconds = (currentTime.getTime() - sessionStartTime.getTime()) / 1000;
+    //   recordSessionDuration(durationSeconds, sessionData.firstPage, sessionData.firstReferrer);
+    // }
 
     // Record page view for every page visit
-    recordPageView(pathname, sessionData.firstReferrer);
+    recordPageView(pathname);
 
     // Log page view
     console.log(

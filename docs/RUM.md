@@ -212,3 +212,69 @@ I'd suggest implementing these in order of value:
 2. 📊 page_views_total (most important for analytics)
 3. 📊 pages_per_session (engagement metric)
 4. 📊 bounce_rate (conversion indicator)
+
+
+# Session duration
+Current Approach: Elapsed Time Since Session Start
+
+- Takes sessionStartTime (when the session was created)
+- Takes current timestamp (when the page view is being tracked)
+- Calculates: (current time - start time) / 1000 = seconds elapsed
+- Records this to the histogram on every page view
+
+Example:
+Page 1 (Home): Session starts at 10:00:00
+→ No duration recorded (isNewSession = true)
+
+Page 2 (About): Visited at 10:00:15
+→ Duration recorded: 15 seconds
+
+Page 3 (Contact): Visited at 10:00:45
+→ Duration recorded: 45 seconds
+
+User closes browser at 10:05:00
+→ Last recorded duration: 45 seconds (lost)
+
+The Issue
+
+This records elapsed time at each page view, not the actual session duration (which you only know when the session ends). So:
+- ❌ You lose the final session duration when the user closes the browser
+- ✅ You get intermediate checkpoints of how long users have been in the session
+
+Better Alternatives
+
+Would you prefer:
+1. Keep current approach - gives intermediate snapshots of session engagement
+2. Time between page views - histogram showing how long users stay on each page
+3. Both - record both elapsed time AND time-per-page
+4. Only on session end - require client to send session end signal (harder to implement)
+
+## Session End
+Solution: Send Session End Event
+
+Would you like me to implement a way to explicitly track session end when the user closes/leaves the browser? This would require:
+1. Adding a beforeunload or pagehide event listener on the client
+2. Sending a "session ended" event to the API
+3. Recording the final session duration at that point
+
+Scenario: User visits home, stays 5 seconds, closes browser
+
+Time: 10:00:00 → User visits home
+→ Page View API called
+→ sessions_created_total: +1 ✓
+→ page_views_total: +1 ✓
+
+Time: 10:00:05 → User closes browser
+→ beforeunload/pagehide event fires
+→ Session End API called
+→ session_duration_seconds: 5 seconds recorded ✓
+
+Metrics Flow
+
+| Event           | Metric                   | Value           | Labels                 |
+|-----------------|--------------------------|-----------------|------------------------|
+| New session     | sessions_created_total   | +1              | landing_page, referrer |
+| Every page view | page_views_total         | +1              | pathname               |
+| Session ends    | session_duration_seconds | actual duration | landing_page, referrer |
+
+All session durations are now accurate and complete, even for single-page visits! 🎉

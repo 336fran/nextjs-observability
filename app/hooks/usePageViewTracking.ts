@@ -38,4 +38,44 @@ export function usePageViewTracking() {
       body: JSON.stringify(pageViewData),
     }).catch(err => console.error('Failed to track page view:', err));
   }, [pathname]);
+
+  // Track session end (beforeunload or pagehide)
+  useEffect(() => {
+    const handleSessionEnd = async () => {
+      if (typeof window === 'undefined') return;
+
+      const sessionDataStr = sessionStorage.getItem('sessionData');
+      if (!sessionDataStr) return;
+
+      const sessionData = JSON.parse(sessionDataStr);
+      const timestamp = new Date().toISOString();
+
+      const sessionEndData = {
+        sessionId: sessionData.sessionId,
+        sessionStartTime: sessionData.sessionStartTime,
+        timestamp,
+        pageViewCount: sessionData.pageViewCount,
+        firstPage: sessionData.firstPage,
+        lastPage: sessionData.lastPage,
+        firstReferrer: sessionData.firstReferrer,
+      };
+
+      console.log('[PAGE_VIEW_CLIENT] SESSION ENDED', sessionEndData);
+
+      // Send session end event to API
+      // Using sendBeacon for reliability as the page is unloading
+      const blob = new Blob([JSON.stringify(sessionEndData)], {
+        type: 'application/json',
+      });
+      navigator.sendBeacon('/api/analytics/session-end', blob);
+    };
+
+    window.addEventListener('beforeunload', handleSessionEnd);
+    window.addEventListener('pagehide', handleSessionEnd);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleSessionEnd);
+      window.removeEventListener('pagehide', handleSessionEnd);
+    };
+  }, []);
 }
