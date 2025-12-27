@@ -214,7 +214,7 @@ I'd suggest implementing these in order of value:
 4. 📊 bounce_rate (conversion indicator)
 
 
-# Session duration
+# Session Duration
 Current Approach: Elapsed Time Since Session Start
 
 - Takes sessionStartTime (when the session was created)
@@ -278,3 +278,216 @@ Metrics Flow
 | Session ends    | session_duration_seconds | actual duration | landing_page, referrer |
 
 All session durations are now accurate and complete, even for single-page visits! 🎉
+
+## Buckets
+Session duration buckets should reflect user engagement levels. Here's what I'd propose:
+
+Suggested Session Duration Buckets
+
+[0, 5, 10, 30, 60, 120, 300, 600, 900, 1800, 3600, 5400, 7200, 10800]
+
+In human terms:
+0s     → Start
+5s     → Bounce threshold (very quick exit)
+10s    → Quick interaction
+30s    → Brief engagement
+60s    → 1 minute (some real interest)
+120s   → 2 minutes (moderate engagement)
+300s   → 5 minutes (good engagement)
+600s   → 10 minutes (strong engagement)
+900s   → 15 minutes (high engagement)
+1800s  → 30 minutes (very engaged)
+3600s  → 1 hour (extremely engaged)
+5400s  → 1.5 hours
+7200s  → 2 hours
+10800s → 3 hours (very long sessions)
+
+Engagement Categories
+
+| Duration | Category    | Interpretation                        |
+|----------|-------------|---------------------------------------|
+| < 5s     | Bounce      | User left immediately                 |
+| 5-30s    | Quick       | User glanced at page                  |
+| 30s-2m   | Brief       | Light engagement                      |
+| 2-10m    | Moderate    | Good engagement                       |
+| 10-30m   | Strong      | High interest                         |
+| 30m-1h   | Very Strong | Very engaged user                     |
+| > 1h     | Extended    | Unusual (reading, working, left idle) |
+
+Alternative: Shorter Focus
+
+If you want buckets focused on mobile/quick sessions:
+[0, 2, 5, 10, 20, 30, 60, 120, 180, 300, 600, 900, 1800]
+
+Which approach fits your app better? Should I update the session duration histogram with these buckets?
+
+
+## Implementation 
+Updated Session Duration Histogram
+
+Buckets: [0, 5, 30, 120, 600, 1800, 3600, 7200] seconds
+
+Engagement Categories:
+
+| Bucket     | Duration | Category    | Interpretation                        |
+|------------|----------|-------------|---------------------------------------|
+| 0-5s       | < 5s     | Bounce      | User left immediately                 |
+| 5-30s      | 5-30s    | Quick       | User glanced at page                  |
+| 30-120s    | 30s-2m   | Brief       | Light engagement                      |
+| 120-600s   | 2-10m    | Moderate    | Good engagement                       |
+| 600-1800s  | 10-30m   | Strong      | High interest                         |
+| 1800-3600s | 30m-1h   | Very Strong | Very engaged user                     |
+| 3600-7200s | 1h-2h    | Extended    | Unusual (reading, working, left idle) |
+
+Benefits
+
+✅ Metrics naturally align with engagement levels
+✅ Easy to identify bounce rates (< 5s)
+✅ Can track engagement trends over time
+✅ Understand user behavior patterns by session length
+✅ Query examples:
+- "What % of users bounce immediately?" (< 5s)
+- "How many users have strong engagement?" (10-30m)
+- "Are our retention rates improving?" (overall distribution)
+
+All your metrics now have optimized buckets aligned with real business insights! 🎯
+
+# Web Vitals
+// Direct use of web-vitals functions
+import { getFCP, getLCP, getCLS, getTTFB, getINP } from 'web-vitals';
+
+getFCP(metric => {
+console.log('FCP:', metric.value);
+});
+
+Pros:
+- ✅ Universal (works with any framework)
+- ✅ More control and flexibility
+- ✅ Can be used anywhere in the app
+
+Cons:
+- ❌ More boilerplate code
+- ❌ Manual setup needed
+- ❌ Duplicates work Next.js already does
+- ❌ Doesn't capture Next.js-specific metrics
+
+Option 2: Next.js useReportWebVitals (Better for your case)
+
+// In next.config.ts
+export function register() {
+if (process.env.NEXT_RUNTIME === 'nodejs') {
+    require('./instrumentation.server');
+}
+}
+
+// In instrumentation.server.ts
+export function reportWebVitals(metric: any) {
+console.log('Metric:', metric.name, metric.value);
+}
+
+Pros:
+- ✅ Built-in for Next.js - no extra library needed
+- ✅ Automatic collection
+- ✅ Captures Next.js-specific metrics (hydration, route change, etc.)
+- ✅ Works seamlessly with SSR
+- ✅ Less boilerplate
+- ✅ Official Next.js solution
+
+Cons:
+- ❌ Next.js specific (but that's fine for you)
+- ❌ Less customizable
+
+Comparison Table
+
+| Aspect                   | web-vitals    | useReportWebVitals |
+|--------------------------|---------------|--------------------|
+| Setup complexity         | Medium        | Simple             |
+| Next.js specific metrics | ❌ No         | ✅ Yes             |
+| Boilerplate              | More          | Less               |
+| Built-in                 | ❌ No         | ✅ Yes             |
+| Flexibility              | High          | Medium             |
+| Best for                 | Any framework | Next.js apps       |
+
+My Recommendation: Use useReportWebVitals
+
+Since you're building a Next.js app, use the built-in solution. You get:
+- Core Web Vitals (FCP, LCP, CLS, TTFB, INP)
+- Next.js-specific metrics (hydration time, route changes)
+- Automatic collection
+- Less code
+
+
+## How It Works
+
+User visits your page → Browser collects Web Vitals → Metrics exported to OpenTelemetry
+
+Page Load Timeline:
+├─ TTFB recorded (0-50ms after request)
+├─ FCP recorded (page first renders)
+├─ LCP recorded (largest element loads)
+├─ INP recorded (user interaction)
+└─ CLS recorded (layout shifts, ongoing)
+
+All metrics are labeled with the current pathname and sent to your OTLP collector
+every 15 seconds.
+
+Metrics Example
+
+When users visit /, you'll get:
+[WEB_VITAL] FCP: 209ms (/)
+[WEB_VITAL] LCP: 445ms (/)
+[WEB_VITAL] CLS: 0.001 (/)
+[WEB_VITAL] TTFB: 30ms (/)
+[WEB_VITAL] INP: 123ms (/)
+
+These are automatically exported to your OpenTelemetry collector where you can:
+- Identify slow pages
+- Track performance improvements over time
+- Alert on Core Web Vitals thresholds
+- Correlate with user sessions
+
+All Web Vitals are now being tracked with real user data! 📊✨
+
+## Thresholds
+Google's Web Vitals Thresholds
+
+| Metric | Good     | Needs Improvement | Poor     |
+|--------|----------|-------------------|----------|
+| FCP    | < 1800ms | 1800-3000ms       | > 3000ms |
+| LCP    | < 2500ms | 2500-4000ms       | > 4000ms |
+| CLS    | < 0.1    | 0.1-0.25          | > 0.25   |
+| TTFB   | < 600ms  | 600-1800ms        | > 1800ms |
+| INP    | < 200ms  | 200-500ms         | > 500ms  |
+
+Better Buckets for Web Vitals
+
+I'd recommend:
+// For FCP, LCP, TTFB, INP (in ms)
+[0, 50, 100, 200, 300, 400, 500, 600, 800, 1000, 1800, 2500, 3000, 4000]
+
+// For CLS (unitless, but scaled to 0.001)
+[0, 0.01, 0.025, 0.05, 0.1, 0.15, 0.2, 0.25, 0.5]
+
+This way, your histograms would naturally align with the "good/needs improvement/poor" boundaries.
+
+Should I update the metrics to use Web Vitals-specific buckets?
+
+
+## Implementation
+Simplified Web Vitals Buckets (6 each)
+
+FCP & LCP (Good < 1800ms, Needs Improvement < 3000ms, Poor >= 3000ms):
+[600, 1200, 1800, 2500, 3000, 4000]
+Captures: Early performance → Good threshold → Needs improvement zone → Poor threshold
+
+TTFB (Good < 600ms, Needs Improvement < 1800ms, Poor >= 1800ms):
+[100, 300, 600, 1000, 1800, 3000]
+Captures: Early → Good threshold → Needs improvement zone → Poor threshold
+
+INP (Good < 200ms, Needs Improvement < 500ms, Poor >= 500ms):
+[50, 100, 200, 300, 500, 1000]
+Captures: Early → Good threshold → Needs improvement zone → Poor threshold
+
+CLS (Good < 0.1, Needs Improvement < 0.25, Poor >= 0.25):
+[0.025, 0.05, 0.1, 0.15, 0.25, 0.5]
+Captures: Early → Good threshold → Needs improvement zone → Poor threshold
