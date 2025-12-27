@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   recordSessionCreated,
@@ -14,6 +15,16 @@ export async function POST(request: NextRequest) {
                      request.headers.get('cf-connecting-ip') ||
                      request.headers.get('x-real-ip') ||
                      'unknown';
+
+    // Get Facebook Pixel cookies
+    const cookieStore = await cookies();
+    const fbc = cookieStore.get('_fbc')?.value;
+    const fbp = cookieStore.get('_fbp')?.value;
+
+    // Log Facebook Pixel cookies if present
+    if (fbc || fbp) {
+      console.log(`[FACEBOOK_PIXEL] fbc: ${fbc || 'null'} | fbp: ${fbp || 'null'}`);
+    }
 
     // Record metrics
     if (isNewSession) {

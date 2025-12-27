@@ -491,3 +491,87 @@ Captures: Early → Good threshold → Needs improvement zone → Poor threshold
 CLS (Good < 0.1, Needs Improvement < 0.25, Poor >= 0.25):
 [0.025, 0.05, 0.1, 0.15, 0.25, 0.5]
 Captures: Early → Good threshold → Needs improvement zone → Poor threshold
+
+# Facebook Cookies
+How to Access Facebook Cookies from Server
+
+Option 1: Manual Parsing (What I showed)
+
+const cookieHeader = request.headers.get('cookie') || '';
+const fbc = parseCookie(cookieHeader, '_fbc');
+- Low-level, manual parsing
+- Works but verbose
+- Error-prone
+
+Option 3: Cookie Library (js-cookie)
+
+import Cookies from 'js-cookie';
+const fbc = Cookies.get('_fbc');
+- Client-side only
+- Cleaner than manual parsing
+- Extra dependency
+
+await cookies() (Next.js built-in) ⭐
+
+import { cookies } from 'next/headers';
+
+const cookieStore = await cookies();
+const fbc = cookieStore.get('_fbc')?.value;
+const fbp = cookieStore.get('_fbp')?.value;
+- ✅ Server-side, built-in utility
+- ✅ Cleaner than manual parsing
+- ✅ No external dependencies
+- ✅ Type-safe
+- ✅ Most idiomatic for Next.js 13+
+
+Option 2: Client-Side (My recommendation)
+
+const fbc = document.cookie.split('; ').find(...)?.split('=')[1];
+const fbp = document.cookie.split('; ').find(...)?.split('=')[1];
+- Client-side only
+- Send via API request
+- Extra network call needed
+
+Fair Comparison
+
+| Approach           | Location | Idiomaticity | Cleanliness | Dependencies | Reliability |
+|--------------------|----------|--------------|-------------|--------------|-------------|
+| Manual parsing     | Server   | ⭐           | ⭐          | None         | ⭐⭐        |
+| Cookie library     | Client   | ⭐⭐         | ⭐⭐⭐      | 1 lib        | ⭐⭐⭐      |
+| await cookies()    | Server   | ⭐⭐⭐⭐⭐   | ⭐⭐⭐⭐⭐  | None         | ⭐⭐⭐⭐⭐  |
+| Client-side direct | Client   | ⭐⭐         | ⭐⭐        | None         | ⭐⭐⭐      |
+
+My Revised Recommendation
+
+Use await cookies() in your API route:
+
+// app/api/analytics/page-view/route.ts
+import { cookies } from 'next/headers';
+import { NextRequest, NextResponse } from 'next/server';
+
+export async function POST(request: NextRequest) {
+const data = await request.json();
+const cookieStore = await cookies();
+
+const fbc = cookieStore.get('_fbc')?.value;
+const fbp = cookieStore.get('_fbp')?.value;
+
+const analyticsData = {
+    ...data,
+    fbc,
+    fbp,
+};
+
+console.log(`[PAGE_VIEW_API] ${data.pathname} | fbc: ${fbc} | fbp: ${fbp}`);
+
+// Rest of your code...
+}
+
+Why await cookies() is better:
+- ✅ Built for Next.js - designed specifically for this use case
+- ✅ Cleaner syntax - no manual parsing needed
+- ✅ Type-safe - TypeScript friendly
+- ✅ No dependencies - zero overhead
+- ✅ Standard practice - what Next.js developers expect
+
+Would you like me to update the page view API to use await cookies() for accessing Facebook Pixel IDs?
