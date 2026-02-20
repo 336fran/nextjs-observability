@@ -35,6 +35,8 @@ Summary:
 
 
 # IP
+Resources
+- [Forward the Real Client IP](https://oscarchou.com/posts/howto/forward-real-client-ip-via-traefik-in-docker-swarm/) (guide)
 
 
 1. Client requests your app
@@ -47,21 +49,47 @@ const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
 
 This checks x-forwarded-for first, which is exactly what Traefik provides.
 
-Make sure Traefik is configured to pass headers:
-
-In your Traefik config, you should have something like:
-entryPoints:
-web:
-    address: ":80"
-    forwardedHeaders:
-    insecure: true  # or set trusted IPs if you want to be strict
-
-Or if using labels on the Docker container:
-labels:
-- "traefik.http.middlewares.forwardheaders.forwardedheaders.insecure=true"
-
+## Traefik Configuration
 With this setup, when you deploy to your VPS with Traefik, you'll see the real client IPs in your logs instead of unknown.
 
+Make sure Traefik is configured to pass headers:
+In your Traefik config, you should have something like:
+```yaml
+entryPoints:
+  websecure:
+    address: ":443"
+    forwardedHeaders:
+      insecure: true  # or set trusted IPs if you want to be strict
+```
+
+In docker compose. 
+`mode`: Specifies how the port is published in a Swarm setup. If set to `host`, it publishes the port on every node in Swarm. If set to `ingress`, it allows load balancing across the nodes in Swarm. Defaults to `ingress`.
+```yaml
+    ports:
+      - target: 80
+        published: 80
+        mode: host  # bypass routing mesh
+      - target: 443
+        published: 443
+        mode: host  # bypass routing mesh
+```
+
+Swarm Service.
+`passHostHeader` allows forwarding of the client Host header to server. By default is true (no need to change).
+```yaml
+  backend:
+    image: your-backend:latest
+    networks:
+      - proxy
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.backend.rule=Host(`api.example.com`)"
+        - "traefik.http.routers.backend.entrypoints=websecure"
+        - "traefik.http.routers.backend.tls.certresolver=leresolver"
+        - "traefik.http.services.backend.loadbalancer.server.port=8080"
+        - "traefik.http.services.backend.loadbalancer.passHostHeader=true"
+```
 
 # Unique Visitors
 Option 1: Simple Session ID (Lightweight)
